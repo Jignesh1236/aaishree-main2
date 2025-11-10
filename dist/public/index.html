@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>ADSC - Daily Report Generator</title>
+    <meta name="description" content="Generate professional daily reports for Aaishree Data Service Center with services, cash tracking, expenses, and automatic profit calculations.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      @media print {
+        @page {
+          size: A4;
+          margin: 15mm;
+        }
+        body {
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+          background: white !important;
+          font-size: 11pt;
+        }
+        * {
+          box-shadow: none !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+        table {
+          page-break-inside: avoid;
+        }
+        h2 {
+          page-break-after: avoid;
+        }
+      }
+      .print-only {
+        display: none;
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-ON1zvGqA.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CK3IIVEH.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
