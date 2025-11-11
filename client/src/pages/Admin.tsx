@@ -2,18 +2,28 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, FileText, History, User, Download, TrendingUp, DollarSign, Calendar } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LogOut, FileText, History, User, Download, TrendingUp, DollarSign, Calendar, Filter } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Report } from "@shared/schema";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 export default function Admin() {
   const { user, logoutMutation } = useAuth();
   const [, setLocation] = useLocation();
-  const [exportFormat, setExportFormat] = useState<'csv' | 'json' | 'pdf'>('csv');
+  
+  // Filter states
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [profitFilter, setProfitFilter] = useState<"all" | "profit" | "loss">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"date" | "profit" | "revenue">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  const { data: reports = [] } = useQuery<Report[]>({
+  const { data: allReports = [] } = useQuery<Report[]>({
     queryKey: ['/api/reports'],
   });
 
@@ -22,8 +32,56 @@ export default function Admin() {
     setLocation("/");
   };
 
-  // Calculate analytics
-  const analytics = {
+  // Filtered and sorted reports
+  const reports = useMemo(() => {
+    let filtered = [...allReports];
+
+    // Date range filter
+    if (dateFrom) {
+      filtered = filtered.filter(r => new Date(r.date) >= new Date(dateFrom));
+    }
+    if (dateTo) {
+      filtered = filtered.filter(r => new Date(r.date) <= new Date(dateTo));
+    }
+
+    // Profit/Loss filter
+    if (profitFilter === "profit") {
+      filtered = filtered.filter(r => parseFloat(r.netProfit) >= 0);
+    } else if (profitFilter === "loss") {
+      filtered = filtered.filter(r => parseFloat(r.netProfit) < 0);
+    }
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(r => {
+        const dateStr = new Date(r.date).toLocaleDateString('en-IN').toLowerCase();
+        const servicesStr = r.services.map(s => s.name.toLowerCase()).join(' ');
+        const expensesStr = r.expenses.map(e => e.name.toLowerCase()).join(' ');
+        return dateStr.includes(query) || servicesStr.includes(query) || expensesStr.includes(query);
+      });
+    }
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let compareValue = 0;
+      
+      if (sortBy === "date") {
+        compareValue = new Date(a.date).getTime() - new Date(b.date).getTime();
+      } else if (sortBy === "profit") {
+        compareValue = parseFloat(a.netProfit) - parseFloat(b.netProfit);
+      } else if (sortBy === "revenue") {
+        compareValue = parseFloat(a.totalServices) - parseFloat(b.totalServices);
+      }
+      
+      return sortOrder === "asc" ? compareValue : -compareValue;
+    });
+
+    return filtered;
+  }, [allReports, dateFrom, dateTo, profitFilter, searchQuery, sortBy, sortOrder]);
+
+  // Calculate analytics from filtered reports
+  const analytics = useMemo(() => ({
     totalReports: reports.length,
     totalRevenue: reports.reduce((sum, r) => sum + parseFloat(r.totalServices), 0),
     totalExpenses: reports.reduce((sum, r) => sum + parseFloat(r.totalExpenses), 0),
@@ -31,7 +89,7 @@ export default function Admin() {
     averageProfit: reports.length > 0 
       ? reports.reduce((sum, r) => sum + parseFloat(r.netProfit), 0) / reports.length 
       : 0,
-  };
+  }), [reports]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -78,15 +136,17 @@ export default function Admin() {
   const exportSummaryReport = () => {
     const summary = {
       generatedOn: new Date().toISOString(),
+      filters: {
+        dateFrom: dateFrom || 'All',
+        dateTo: dateTo || 'All',
+        profitFilter,
+        searchQuery: searchQuery || 'None'
+      },
       totalReports: analytics.totalReports,
       totalRevenue: analytics.totalRevenue,
       totalExpenses: analytics.totalExpenses,
       totalProfit: analytics.totalProfit,
       averageProfit: analytics.averageProfit,
-      dateRange: {
-        from: reports.length > 0 ? new Date(Math.min(...reports.map(r => new Date(r.date).getTime()))).toISOString() : null,
-        to: reports.length > 0 ? new Date(Math.max(...reports.map(r => new Date(r.date).getTime()))).toISOString() : null,
-      },
       reports: reports.map(r => ({
         date: r.date,
         totalServices: r.totalServices,
@@ -104,20 +164,14 @@ export default function Admin() {
     a.click();
   };
 
-  const handleExport = () => {
-    if (exportFormat === 'csv') {
-      exportToCSV();
-    } else if (exportFormat === 'json') {
-      exportToJSON();
-    } else {
-      exportSummaryReport();
-    }
+  const clearFilters = () => {
+    setDateFrom("");
+    setDateTo("");
+    setProfitFilter("all");
+    setSearchQuery("");
+    setSortBy("date");
+    setSortOrder("desc");
   };
-
-  // Get recent reports (last 7 days)
-  const recentReports = reports
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 7);
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,6 +204,103 @@ export default function Admin() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Filters Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="h-5 w-5" />
+                  Filters
+                </CardTitle>
+                <CardDescription>Filter and sort reports</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date-from">Date From</Label>
+                <Input
+                  id="date-from"
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="date-to">Date To</Label>
+                <Input
+                  id="date-to"
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profit-filter">Profit/Loss</Label>
+                <Select value={profitFilter} onValueChange={(value: any) => setProfitFilter(value)}>
+                  <SelectTrigger id="profit-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Reports</SelectItem>
+                    <SelectItem value="profit">Profit Only</SelectItem>
+                    <SelectItem value="loss">Loss Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="search">Search</Label>
+                <Input
+                  id="search"
+                  type="text"
+                  placeholder="Search by date, service, expense..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sort-by">Sort By</Label>
+                <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                  <SelectTrigger id="sort-by">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Date</SelectItem>
+                    <SelectItem value="profit">Profit</SelectItem>
+                    <SelectItem value="revenue">Revenue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sort-order">Sort Order</Label>
+                <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                  <SelectTrigger id="sort-order">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">Descending</SelectItem>
+                    <SelectItem value="asc">Ascending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="mt-4 text-sm text-muted-foreground">
+              Showing {reports.length} of {allReports.length} reports
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Analytics Cards */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -159,7 +310,7 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{analytics.totalReports}</div>
-              <p className="text-xs text-muted-foreground">All time reports</p>
+              <p className="text-xs text-muted-foreground">Filtered results</p>
             </CardContent>
           </Card>
 
@@ -172,7 +323,7 @@ export default function Admin() {
               <div className="text-2xl font-bold text-green-600">
                 {formatCurrency(analytics.totalRevenue)}
               </div>
-              <p className="text-xs text-muted-foreground">From all services</p>
+              <p className="text-xs text-muted-foreground">From filtered reports</p>
             </CardContent>
           </Card>
 
@@ -185,7 +336,7 @@ export default function Admin() {
               <div className="text-2xl font-bold text-red-600">
                 {formatCurrency(analytics.totalExpenses)}
               </div>
-              <p className="text-xs text-muted-foreground">All expenses</p>
+              <p className="text-xs text-muted-foreground">From filtered reports</p>
             </CardContent>
           </Card>
 
@@ -209,7 +360,7 @@ export default function Admin() {
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Export Reports</CardTitle>
-            <CardDescription>Download all reports in various formats</CardDescription>
+            <CardDescription>Download filtered reports in various formats</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
@@ -232,16 +383,16 @@ export default function Admin() {
           </CardContent>
         </Card>
 
-        {/* Recent Reports */}
+        {/* Filtered Reports List */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Recent Reports</CardTitle>
-            <CardDescription>Last 7 reports overview</CardDescription>
+            <CardTitle>Filtered Reports</CardTitle>
+            <CardDescription>Reports matching your filter criteria</CardDescription>
           </CardHeader>
           <CardContent>
-            {recentReports.length > 0 ? (
+            {reports.length > 0 ? (
               <div className="space-y-3">
-                {recentReports.map((report) => (
+                {reports.map((report) => (
                   <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <Calendar className="h-5 w-5 text-muted-foreground" />
@@ -271,7 +422,7 @@ export default function Admin() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-muted-foreground py-8">No reports available</p>
+              <p className="text-center text-muted-foreground py-8">No reports match your filters</p>
             )}
           </CardContent>
         </Card>
@@ -326,38 +477,6 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Admin Features */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Admin Features</CardTitle>
-            <CardDescription>Available actions with admin privileges</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-                <span>Full access to create and edit reports</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-                <span>Delete reports with admin authentication</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-                <span>View complete report history and analytics</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-                <span>Export reports in CSV, JSON, and summary formats</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-                <span>Print and export reports</span>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
