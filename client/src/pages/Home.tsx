@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Printer, Calendar, Save, History, LogIn, Shield } from "lucide-react";
+import { Printer, Calendar, Save, History, LogIn, Shield, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -20,6 +20,7 @@ export default function Home() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [onlinePayment, setOnlinePayment] = useState<string>('0');
   const [showReport, setShowReport] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -55,8 +56,9 @@ export default function Home() {
   const calculateSummary = (): ReportSummary => {
     const totalServices = services.reduce((sum, s) => sum + s.amount, 0);
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const onlinePaymentAmount = parseFloat(onlinePayment) || 0;
     const netProfit = totalServices - totalExpenses;
-    return { totalServices, totalExpenses, netProfit };
+    return { totalServices, totalExpenses, netProfit, onlinePayment: onlinePaymentAmount, cashPayment: 0 };
   };
 
   const report: DailyReport = {
@@ -109,6 +111,7 @@ export default function Home() {
       totalServices: summary.totalServices.toString(),
       totalExpenses: summary.totalExpenses.toString(),
       netProfit: summary.netProfit.toString(),
+      onlinePayment: onlinePayment,
     };
     saveReportMutation.mutate(reportData);
   };
@@ -117,6 +120,7 @@ export default function Home() {
     if (existingReport) {
       setServices(existingReport.services as ServiceItem[]);
       setExpenses(existingReport.expenses as ExpenseItem[]);
+      setOnlinePayment(existingReport.onlinePayment || '0');
       setShowReport(true);
       toast({
         title: "Report Loaded",
@@ -233,6 +237,31 @@ export default function Home() {
               <ExpenseEntryForm expenses={expenses} onExpensesChange={setExpenses} />
             </Card>
 
+            <Card className="p-6 shadow-lg border-0 bg-card/50 backdrop-blur">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-green-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground">Online Payment</h2>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="online-payment" className="text-sm font-medium">
+                  Online Payment Amount (₹)
+                </Label>
+                <Input
+                  id="online-payment"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={onlinePayment}
+                  onChange={(e) => setOnlinePayment(e.target.value)}
+                  placeholder="0.00"
+                  className="h-11"
+                  data-testid="input-online-payment"
+                />
+              </div>
+            </Card>
+
             <div className="flex gap-3 pt-2">
               <Button
                 onClick={handleGenerateReport}
@@ -246,6 +275,7 @@ export default function Home() {
                 onClick={() => {
                   setServices([]);
                   setExpenses([]);
+                  setOnlinePayment('0');
                   setShowReport(false);
                 }}
                 variant="outline"

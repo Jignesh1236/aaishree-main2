@@ -5,15 +5,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LogOut, FileText, History, User, Download, TrendingUp, DollarSign, Calendar, Filter } from "lucide-react";
+import { LogOut, FileText, History, User, Download, TrendingUp, DollarSign, Calendar, Filter, Edit, Printer, Trash2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Report } from "@shared/schema";
 import { useState, useMemo } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import ReportDisplay from "@/components/ReportDisplay";
 
 export default function Admin() {
   const { user, logoutMutation } = useAuth();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   
   // Filter states
   const [dateFrom, setDateFrom] = useState("");
@@ -22,9 +26,39 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "profit" | "revenue">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  
+  // Edit and monthly summary states
+  const [editingReport, setEditingReport] = useState<Report | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  
+  // Edit form states
+  const [editDate, setEditDate] = useState("");
+  const [editServices, setEditServices] = useState<any[]>([]);
+  const [editExpenses, setEditExpenses] = useState<any[]>([]);
+  const [editOnlinePayment, setEditOnlinePayment] = useState("0");
 
   const { data: allReports = [] } = useQuery<Report[]>({
     queryKey: ['/api/reports'],
+  });
+
+  const updateReportMutation = useMutation({
+    mutationFn: async (data: { id: number; report: any }) => {
+      const response = await fetch(`/api/reports/${data.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data.report),
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to update report');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/reports'] });
+      setEditingReport(null);
+    },
   });
 
   const handleLogout = () => {
@@ -162,6 +196,106 @@ export default function Admin() {
     a.href = url;
     a.download = `adsc-summary-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
+  };
+
+  // Monthly summary calculation
+  const monthlySummary = useMemo(() => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const monthReports = allReports.filter(r => {
+      const reportDate = new Date(r.date);
+      return reportDate.getFullYear() === year && reportDate.getMonth() + 1 === month;
+    });
+
+    return {
+      totalReports: monthReports.length,
+      totalRevenue: monthReports.reduce((sum, r) => sum + parseFloat(r.totalServices), 0),
+      totalExpenses: monthReports.reduce((sum, r) => sum + parseFloat(r.totalExpenses), 0),
+      totalProfit: monthReports.reduce((sum, r) => sum + parseFloat(r.netProfit), 0),
+      totalOnlinePayment: monthReports.reduce((sum, r) => sum + parseFloat(r.onlinePayment || '0'), 0),
+      reports: monthReports.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    };
+  }, [allReports, selectedMonth]);
+
+  const handleEditReport = (report: Report) => {
+    setEditingReport(report);
+    setEditDate(report.date);
+    setEditServices(report.services as any[]);
+    setEditExpenses(report.expenses as any[]);
+    setEditOnlinePayment(report.onlinePayment || '0');
+  };
+
+  const handlePrintMonthlySummary = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Monthly Summary - ${selectedMonth}</title>
+            ${Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))
+              .map(el => el.outerHTML)
+              .join('\n')}
+          </head>
+          <body>
+            ${document.querySelector('.monthly-summary-print')?.outerHTML || ''}
+            <script>
+              window.onload = function() {
+                window.print();
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  const handleUpdateService = (index: number, field: string, value: string) => {
+    const updated = [...editServices];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditServices(updated);
+  };
+
+  const handleUpdateExpense = (index: number, field: string, value: string) => {
+    const updated = [...editExpenses];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditExpenses(updated);
+  };
+
+  const handleAddService = () => {
+    setEditServices([...editServices, { name: '', amount: 0 }]);
+  };
+
+  const handleAddExpense = () => {
+    setEditExpenses([...editExpenses, { name: '', amount: 0 }]);
+  };
+
+  const handleRemoveService = (index: number) => {
+    setEditServices(editServices.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveExpense = (index: number) => {
+    setEditExpenses(editExpenses.filter((_, i) => i !== index));
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingReport) return;
+    
+    const totalServices = editServices.reduce((sum, s) => sum + parseFloat(s.amount || '0'), 0);
+    const totalExpenses = editExpenses.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
+    const netProfit = totalServices - totalExpenses;
+    
+    const updatedReport = {
+      date: editDate,
+      services: editServices,
+      expenses: editExpenses,
+      totalServices: totalServices.toString(),
+      totalExpenses: totalExpenses.toString(),
+      netProfit: netProfit.toString(),
+      onlinePayment: editOnlinePayment,
+    };
+    
+    updateReportMutation.mutate({ id: editingReport.id, report: updatedReport });
   };
 
   const clearFilters = () => {
@@ -410,13 +544,23 @@ export default function Admin() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`font-semibold ${parseFloat(report.netProfit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatCurrency(parseFloat(report.netProfit))}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Revenue: {formatCurrency(parseFloat(report.totalServices))}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className={`font-semibold ${parseFloat(report.netProfit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(parseFloat(report.netProfit))}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Revenue: {formatCurrency(parseFloat(report.totalServices))}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleEditReport(report)}
+                        title="Edit Report"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -477,7 +621,265 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Monthly Summary Section */}
+        <Card className="mt-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Monthly Summary
+                </CardTitle>
+                <CardDescription>View comprehensive monthly report summary</CardDescription>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="month-select" className="text-sm font-medium whitespace-nowrap">
+                    Select Month:
+                  </Label>
+                  <Input
+                    id="month-select"
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="w-48"
+                  />
+                </div>
+                <Button onClick={handlePrintMonthlySummary} variant="outline" size="sm">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Summary
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="monthly-summary-print">
+              <div className="mb-6 no-print">
+                <h3 className="text-lg font-semibold mb-2">
+                  Summary for {new Date(selectedMonth + '-01').toLocaleDateString('en-IN', { year: 'numeric', month: 'long' })}
+                </h3>
+              </div>
+
+              <div className="hidden print:block mb-6">
+                <div className="text-center border-b-2 border-gray-800 pb-4 mb-4">
+                  <img src="/adsc-logo.png" alt="ADSC Logo" className="h-16 w-auto mx-auto mb-2" />
+                  <h1 className="text-2xl font-bold">Aaishree Data Service Center</h1>
+                  <h2 className="text-xl font-semibold mt-2">
+                    Monthly Summary - {new Date(selectedMonth + '-01').toLocaleDateString('en-IN', { year: 'numeric', month: 'long' })}
+                  </h2>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-4 gap-4 mb-6">
+                <div className="p-4 bg-muted rounded-lg print:bg-gray-100 print:border print:border-gray-800">
+                  <p className="text-sm text-muted-foreground print:text-gray-600">Total Reports</p>
+                  <p className="text-2xl font-bold print:text-black">{monthlySummary.totalReports}</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg print:bg-gray-100 print:border print:border-gray-800">
+                  <p className="text-sm text-green-600 print:text-gray-600">Total Revenue</p>
+                  <p className="text-2xl font-bold text-green-600 print:text-black">{formatCurrency(monthlySummary.totalRevenue)}</p>
+                </div>
+                <div className="p-4 bg-red-50 rounded-lg print:bg-gray-100 print:border print:border-gray-800">
+                  <p className="text-sm text-red-600 print:text-gray-600">Total Expenses</p>
+                  <p className="text-2xl font-bold text-red-600 print:text-black">{formatCurrency(monthlySummary.totalExpenses)}</p>
+                </div>
+                <div className="p-4 bg-blue-50 rounded-lg print:bg-gray-100 print:border print:border-gray-800">
+                  <p className="text-sm text-blue-600 print:text-gray-600">Net Profit</p>
+                  <p className={`text-2xl font-bold print:text-black ${monthlySummary.totalProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                    {formatCurrency(monthlySummary.totalProfit)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-6 p-4 bg-green-50 rounded-lg print:bg-gray-100 print:border print:border-gray-800">
+                <p className="text-sm text-green-600 print:text-gray-600">Total Online Payment</p>
+                <p className="text-2xl font-bold text-green-600 print:text-black">{formatCurrency(monthlySummary.totalOnlinePayment)}</p>
+              </div>
+
+              {monthlySummary.reports.length > 0 ? (
+                <div className="border rounded-lg overflow-hidden print:border-2 print:border-gray-800">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted print:bg-gray-200">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold print:text-black print:border print:border-gray-800">Date</th>
+                        <th className="text-right px-3 py-2 font-semibold print:text-black print:border print:border-gray-800">Revenue</th>
+                        <th className="text-right px-3 py-2 font-semibold print:text-black print:border print:border-gray-800">Expenses</th>
+                        <th className="text-right px-3 py-2 font-semibold print:text-black print:border print:border-gray-800">Online Payment</th>
+                        <th className="text-right px-3 py-2 font-semibold print:text-black print:border print:border-gray-800">Net Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlySummary.reports.map((report, index) => (
+                        <tr key={report.id} className={index % 2 === 0 ? 'bg-background print:bg-white' : 'bg-muted/30 print:bg-gray-50'}>
+                          <td className="px-3 py-2 print:text-black print:border print:border-gray-800">
+                            {new Date(report.date).toLocaleDateString('en-IN')}
+                          </td>
+                          <td className="px-3 py-2 text-right print:text-black print:border print:border-gray-800">
+                            {formatCurrency(parseFloat(report.totalServices))}
+                          </td>
+                          <td className="px-3 py-2 text-right print:text-black print:border print:border-gray-800">
+                            {formatCurrency(parseFloat(report.totalExpenses))}
+                          </td>
+                          <td className="px-3 py-2 text-right print:text-black print:border print:border-gray-800">
+                            {formatCurrency(parseFloat(report.onlinePayment || '0'))}
+                          </td>
+                          <td className={`px-3 py-2 text-right font-medium print:border print:border-gray-800 ${parseFloat(report.netProfit) >= 0 ? 'text-green-600 print:text-black' : 'text-red-600 print:text-black'}`}>
+                            {formatCurrency(parseFloat(report.netProfit))}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-muted font-bold print:bg-gray-300">
+                        <td className="px-3 py-2 print:text-black print:border print:border-gray-800 font-bold">TOTAL</td>
+                        <td className="px-3 py-2 text-right print:text-black print:border print:border-gray-800 font-bold">
+                          {formatCurrency(monthlySummary.totalRevenue)}
+                        </td>
+                        <td className="px-3 py-2 text-right print:text-black print:border print:border-gray-800 font-bold">
+                          {formatCurrency(monthlySummary.totalExpenses)}
+                        </td>
+                        <td className="px-3 py-2 text-right print:text-black print:border print:border-gray-800 font-bold">
+                          {formatCurrency(monthlySummary.totalOnlinePayment)}
+                        </td>
+                        <td className={`px-3 py-2 text-right print:border print:border-gray-800 font-bold ${monthlySummary.totalProfit >= 0 ? 'text-green-600 print:text-black' : 'text-red-600 print:text-black'}`}>
+                          {formatCurrency(monthlySummary.totalProfit)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8 print:text-black">No reports found for this month</p>
+              )}
+
+              <div className="hidden print:block mt-8 pt-6 border-t border-gray-400">
+                <div className="flex justify-end">
+                  <div className="text-center">
+                    <div className="border-t-2 border-gray-800 w-48 mb-2"></div>
+                    <p className="text-sm font-semibold">Authorized Signature</p>
+                    <p className="text-xs text-gray-600 mt-1">ADSC</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hidden print:block mt-4 text-center text-gray-600 text-sm">
+                <p>Generated on {new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Edit Report Dialog */}
+      <Dialog open={!!editingReport} onOpenChange={() => setEditingReport(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Report</DialogTitle>
+          </DialogHeader>
+          {editingReport && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="edit-date">Date</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold">Services</Label>
+                  <Button onClick={handleAddService} size="sm" variant="outline">
+                    + Add Service
+                  </Button>
+                </div>
+                {editServices.map((service, index) => (
+                  <div key={index} className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Service name"
+                        value={service.name}
+                        onChange={(e) => handleUpdateService(index, 'name', e.target.value)}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        type="number"
+                        placeholder="Amount"
+                        value={service.amount}
+                        onChange={(e) => handleUpdateService(index, 'amount', e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveService(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold">Expenses</Label>
+                  <Button onClick={handleAddExpense} size="sm" variant="outline">
+                    + Add Expense
+                  </Button>
+                </div>
+                {editExpenses.map((expense, index) => (
+                  <div key={index} className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Expense name"
+                        value={expense.name}
+                        onChange={(e) => handleUpdateExpense(index, 'name', e.target.value)}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        type="number"
+                        placeholder="Amount"
+                        value={expense.amount}
+                        onChange={(e) => handleUpdateExpense(index, 'amount', e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveExpense(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-online-payment">Online Payment</Label>
+                <Input
+                  id="edit-online-payment"
+                  type="number"
+                  value={editOnlinePayment}
+                  onChange={(e) => setEditOnlinePayment(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-2 justify-end border-t">
+                <Button variant="outline" onClick={() => setEditingReport(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit} disabled={updateReportMutation.isPending}>
+                  {updateReportMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
