@@ -14,7 +14,7 @@ import ExpenseEntryForm from "@/components/ExpenseEntryForm";
 import ReportDisplay from "@/components/ReportDisplay";
 import type { ServiceItem, ExpenseItem, DailyReport, ReportSummary, Report } from "@shared/schema";
 
-const logoUrl = "/attached_assets/adsc-logo.png";
+const logoUrl = "/attached_assets/download_1762507279905.png";
 
 export default function Home() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -131,7 +131,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <img src="/attached_assets/adsc-logo.png" alt="ADSC Logo" className="h-14 w-auto" />
+              <img src="/public/adsc-logo.png" alt="ADSC Logo" className="h-14 w-auto" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground tracking-tight" data-testid="text-app-title">
                   ADSC Daily Report Generator
