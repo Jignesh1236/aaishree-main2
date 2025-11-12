@@ -7,6 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Printer, Calendar, Save, History, LogIn, Shield, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
 import ServiceEntryForm from "@/components/ServiceEntryForm";
@@ -22,6 +30,8 @@ export default function Home() {
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [onlinePayment, setOnlinePayment] = useState<string>('0');
   const [showReport, setShowReport] = useState(false);
+  const [showOperatorDialog, setShowOperatorDialog] = useState(false);
+  const [operatorName, setOperatorName] = useState('');
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -70,7 +80,28 @@ export default function Home() {
   const summary = calculateSummary();
 
   const handlePrint = () => {
-    // Open print in new tab
+    setShowOperatorDialog(true);
+  };
+
+  const handleConfirmPrint = () => {
+    if (!operatorName.trim()) {
+      toast({
+        title: "Operator Name Required",
+        description: "Please enter the operator name for the signature.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Store operator name temporarily in the DOM
+    const reportContainer = document.querySelector('.print-report-container');
+    if (reportContainer) {
+      const operatorSignElement = reportContainer.querySelector('.operator-signature-name');
+      if (operatorSignElement) {
+        operatorSignElement.textContent = operatorName;
+      }
+    }
+
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
@@ -78,9 +109,7 @@ export default function Home() {
         <html>
           <head>
             <title>Print Report - ${new Date(date).toLocaleDateString('en-IN')}</title>
-            ${Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))
-              .map(el => el.outerHTML)
-              .join('\n')}
+            ${Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style')).map(style => style.outerHTML).join('\n')}
           </head>
           <body>
             ${document.querySelector('.print-report-container')?.outerHTML || ''}
@@ -94,6 +123,9 @@ export default function Home() {
       `);
       printWindow.document.close();
     }
+
+    setShowOperatorDialog(false);
+    setOperatorName('');
   };
 
   const handleGenerateReport = () => {
@@ -194,7 +226,7 @@ export default function Home() {
                 </div>
                 <h2 className="text-xl font-semibold text-foreground">Report Information</h2>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="report-date" className="text-sm font-medium">
@@ -209,7 +241,7 @@ export default function Home() {
                     data-testid="input-report-date"
                   />
                 </div>
-                
+
                 {existingReport && (
                   <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
                     <p className="text-sm text-foreground mb-3 font-medium">
@@ -317,6 +349,41 @@ export default function Home() {
           <ReportDisplay report={report} summary={summary} />
         </div>
       )}
+
+      <Dialog open={showOperatorDialog} onOpenChange={setShowOperatorDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Operator Signature</DialogTitle>
+            <DialogDescription>
+              Enter the operator name that will appear on the printed report.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="operator-name">Operator Name</Label>
+            <Input
+              id="operator-name"
+              type="text"
+              value={operatorName}
+              onChange={(e) => setOperatorName(e.target.value)}
+              placeholder="Enter operator name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleConfirmPrint();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowOperatorDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmPrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

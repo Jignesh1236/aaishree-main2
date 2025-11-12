@@ -186,7 +186,12 @@ export default function ReportDisplay({ report, summary }: ReportDisplayProps) {
         </Card>
 
         <div className="mt-8 print:mt-12 pt-6 border-t border-gray-300">
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            <div className="text-center">
+              <div className="border-t-2 border-gray-800 w-48 mb-2 print:mb-3"></div>
+              <p className="text-sm font-semibold text-foreground print:text-black">Operator Signature</p>
+              <p className="text-xs text-muted-foreground print:text-gray-600 mt-1 operator-signature-name">&nbsp;</p>
+            </div>
             <div className="text-center">
               <div className="border-t-2 border-gray-800 w-48 mb-2 print:mb-3"></div>
               <p className="text-sm font-semibold text-foreground print:text-black">Authorized Signature</p>
