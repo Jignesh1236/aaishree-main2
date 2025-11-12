@@ -27,7 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-const logoUrl = "/public/adsc-logo-alt.png";
+const logoUrl = "/adsc-logo.png";
 
 export default function History() {
   const { toast } = useToast();
@@ -290,6 +290,8 @@ export default function History() {
                   totalServices: parseFloat(selectedReport.totalServices as string),
                   totalExpenses: parseFloat(selectedReport.totalExpenses as string),
                   netProfit: parseFloat(selectedReport.netProfit as string),
+                  onlinePayment: parseFloat(selectedReport.onlinePayment as string || '0'),
+                  cashPayment: 0,
                 }}
               />
             </div>

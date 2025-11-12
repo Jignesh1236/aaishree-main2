@@ -166,6 +166,10 @@ export default function ReportDisplay({ report, summary }: ReportDisplayProps) {
               <span className="font-semibold print:text-sm">{formatCurrency(summary.totalServices)}</span>
             </div>
             <div className="flex justify-between items-center pb-2 border-b print:text-black print:border-gray-300 print:pb-1">
+              <span className="font-medium print:text-sm">Online Payment</span>
+              <span className="font-semibold print:text-sm text-green-600 print:text-green-700">{formatCurrency(summary.onlinePayment)}</span>
+            </div>
+            <div className="flex justify-between items-center pb-2 border-b print:text-black print:border-gray-300 print:pb-1">
               <span className="font-medium print:text-sm">Total Expenses</span>
               <span className="font-semibold print:text-sm">{formatCurrency(summary.totalExpenses)}</span>
             </div>
@@ -180,6 +184,21 @@ export default function ReportDisplay({ report, summary }: ReportDisplayProps) {
             </div>
           </div>
         </Card>
+
+        <div className="mt-8 print:mt-12 pt-6 border-t border-gray-300">
+          <div className="flex justify-between">
+            <div className="text-center">
+              <div className="border-t-2 border-gray-800 w-48 mb-2 print:mb-3"></div>
+              <p className="text-sm font-semibold text-foreground print:text-black">Operator Signature</p>
+              <p className="text-xs text-muted-foreground print:text-gray-600 mt-1 operator-signature-name">&nbsp;</p>
+            </div>
+            <div className="text-center">
+              <div className="border-t-2 border-gray-800 w-48 mb-2 print:mb-3"></div>
+              <p className="text-sm font-semibold text-foreground print:text-black">Authorized Signature</p>
+              <p className="text-xs text-muted-foreground print:text-gray-600 mt-1">ADSC</p>
+            </div>
+          </div>
+        </div>
 
         <div className="hidden print:block print-footer border-t border-gray-400 text-center text-gray-600">
           <p>Generated on {new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}</p>
