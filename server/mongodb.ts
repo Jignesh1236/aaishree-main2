@@ -176,6 +176,35 @@ export class MongoStorage implements IStorage {
 
     await collection.deleteOne({ _id: objectId });
   }
+
+  async updateReport(id: string, reportData: any): Promise<{ success: boolean }> {
+    const collection = await this.getCollection();
+    if (!collection) {
+      throw new Error('Database not available - please set MONGODB_URI');
+    }
+    
+    let objectId;
+    
+    try {
+      objectId = new ObjectId(id);
+    } catch {
+      throw new Error('Invalid report ID');
+    }
+
+    const updateData: any = {};
+    if (reportData.services !== undefined) updateData.services = reportData.services;
+    if (reportData.expenses !== undefined) updateData.expenses = reportData.expenses;
+    if (reportData.totalServices !== undefined) updateData.totalServices = reportData.totalServices;
+    if (reportData.totalExpenses !== undefined) updateData.totalExpenses = reportData.totalExpenses;
+    if (reportData.netProfit !== undefined) updateData.netProfit = reportData.netProfit;
+
+    await collection.updateOne(
+      { _id: objectId },
+      { $set: updateData }
+    );
+
+    return { success: true };
+  }
 }
 
 export const mongoStorage = new MongoStorage();
