@@ -1,5 +1,6 @@
 // server/index.ts
 import express2 from "express";
+import helmet from "helmet";
 
 // server/routes.ts
 import { createServer } from "http";
@@ -140,6 +141,29 @@ var MongoStorage = class {
     }
     await collection.deleteOne({ _id: objectId });
   }
+  async updateReport(id, reportData) {
+    const collection = await this.getCollection();
+    if (!collection) {
+      throw new Error("Database not available - please set MONGODB_URI");
+    }
+    let objectId;
+    try {
+      objectId = new ObjectId(id);
+    } catch {
+      throw new Error("Invalid report ID");
+    }
+    const updateData = {};
+    if (reportData.services !== void 0) updateData.services = reportData.services;
+    if (reportData.expenses !== void 0) updateData.expenses = reportData.expenses;
+    if (reportData.totalServices !== void 0) updateData.totalServices = reportData.totalServices;
+    if (reportData.totalExpenses !== void 0) updateData.totalExpenses = reportData.totalExpenses;
+    if (reportData.netProfit !== void 0) updateData.netProfit = reportData.netProfit;
+    await collection.updateOne(
+      { _id: objectId },
+      { $set: updateData }
+    );
+    return { success: true };
+  }
 };
 var mongoStorage = new MongoStorage();
 
@@ -164,15 +188,16 @@ var insertReportSchema = z.object({
   expenses: z.array(expenseItemSchema).default([]),
   totalServices: z.string(),
   totalExpenses: z.string(),
-  netProfit: z.string()
+  netProfit: z.string(),
+  onlinePayment: z.string().optional().default("0")
 });
 var reportSchema = insertReportSchema.extend({
   id: z.string(),
   createdAt: z.date()
 });
 var insertUserSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters")
+  username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must not exceed 30 characters").regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(100, "Password must not exceed 100 characters").regex(/[A-Z]/, "Password must contain at least one uppercase letter").regex(/[a-z]/, "Password must contain at least one lowercase letter").regex(/[0-9]/, "Password must contain at least one number").regex(/[^A-Za-z0-9]/, "Password must contain at least one special character")
 });
 var userSchema = insertUserSchema.extend({
   id: z.string(),
@@ -184,6 +209,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import MemoryStore from "memorystore";
+import rateLimit from "express-rate-limit";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { MongoClient as MongoClient2, ObjectId as ObjectId2 } from "mongodb";
@@ -191,6 +217,26 @@ var scryptAsync = promisify(scrypt);
 var MemorySessionStore = MemoryStore(session);
 var client2 = null;
 var dbConnected = false;
+var loginAttempts = /* @__PURE__ */ new Map();
+var loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1e3,
+  // 15 minutes
+  max: 5,
+  // 5 attempts per window
+  message: { error: "Too many login attempts. Please try again after 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true
+});
+var registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1e3,
+  // 1 hour
+  max: 3,
+  // 3 registrations per hour per IP
+  message: { error: "Too many accounts created. Please try again after 1 hour." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 async function getDb() {
   if (!client2) {
     const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
@@ -219,6 +265,36 @@ async function getDb() {
     }
   }
   return client2 ? client2.db("adsc_reports") : null;
+}
+function checkAccountLockout(username) {
+  const attempt = loginAttempts.get(username);
+  if (!attempt) return { locked: false };
+  if (attempt.lockedUntil && attempt.lockedUntil > Date.now()) {
+    const remainingTime = Math.ceil((attempt.lockedUntil - Date.now()) / 1e3 / 60);
+    return { locked: true, remainingTime };
+  }
+  if (attempt.lockedUntil && attempt.lockedUntil <= Date.now()) {
+    loginAttempts.delete(username);
+    return { locked: false };
+  }
+  return { locked: false };
+}
+function recordFailedLogin(username) {
+  const attempt = loginAttempts.get(username) || { count: 0, lastAttempt: Date.now() };
+  const timeSinceLastAttempt = Date.now() - attempt.lastAttempt;
+  if (timeSinceLastAttempt > 15 * 60 * 1e3) {
+    attempt.count = 1;
+  } else {
+    attempt.count += 1;
+  }
+  attempt.lastAttempt = Date.now();
+  if (attempt.count >= 5) {
+    attempt.lockedUntil = Date.now() + 30 * 60 * 1e3;
+  }
+  loginAttempts.set(username, attempt);
+}
+function clearFailedLogins(username) {
+  loginAttempts.delete(username);
 }
 async function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
@@ -271,16 +347,25 @@ async function ensureAdminUser() {
 function setupAuth(app2) {
   ensureAdminUser();
   const store = new MemorySessionStore({ checkPeriod: 864e5 });
+  const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString("hex");
+  if (!process.env.SESSION_SECRET) {
+    console.warn("\u26A0\uFE0F  SESSION_SECRET not set - using random generated secret (sessions will not persist across restarts)");
+  }
   const sessionSettings = {
-    secret: process.env.SESSION_SECRET || "adsc-secret-key-change-in-production",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     store,
     cookie: {
-      maxAge: 7 * 24 * 60 * 60 * 1e3,
+      maxAge: 24 * 60 * 60 * 1e3,
+      // 24 hours instead of 7 days
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production"
-    }
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict"
+      // CSRF protection
+    },
+    name: "sessionId"
+    // Hide default session cookie name
   };
   app2.set("trust proxy", 1);
   app2.use(session(sessionSettings));
@@ -289,10 +374,18 @@ function setupAuth(app2) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
+        const lockout = checkAccountLockout(username);
+        if (lockout.locked) {
+          return done(null, false, {
+            message: `Account temporarily locked. Try again in ${lockout.remainingTime} minutes.`
+          });
+        }
         const user = await getUserByUsername(username);
         if (!user || !await comparePasswords(password, user.password)) {
-          return done(null, false);
+          recordFailedLogin(username);
+          return done(null, false, { message: "Invalid username or password" });
         } else {
+          clearFailedLogins(username);
           return done(null, {
             id: user._id.toString(),
             username: user.username,
@@ -320,8 +413,21 @@ function setupAuth(app2) {
       done(error);
     }
   });
-  app2.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+  app2.post("/api/login", loginLimiter, (req, res, next) => {
+    passport.authenticate("local", (err, user, info) => {
+      if (err) {
+        return next(err);
+      }
+      if (!user) {
+        return res.status(401).json({ error: info?.message || "Invalid credentials" });
+      }
+      req.logIn(user, (err2) => {
+        if (err2) {
+          return next(err2);
+        }
+        return res.status(200).json(user);
+      });
+    })(req, res, next);
   });
   app2.post("/api/logout", (req, res, next) => {
     req.logout((err) => {
@@ -342,8 +448,59 @@ function requireAuth(req, res, next) {
 }
 
 // server/routes.ts
+import { MongoClient as MongoClient3 } from "mongodb";
 async function registerRoutes(app2) {
   setupAuth(app2);
+  app2.post("/api/change-password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current password and new password are required" });
+      }
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "New password must be at least 8 characters long" });
+      }
+      const username = req.user?.username;
+      if (!username) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const isValidPassword = await comparePasswords(currentPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+      const hashedNewPassword = await hashPassword(newPassword);
+      const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+      if (!mongoUri) {
+        return res.status(500).json({ error: "Database not configured" });
+      }
+      let finalUri = mongoUri;
+      if (!mongoUri.includes("retryWrites")) {
+        const separator = mongoUri.includes("?") ? "&" : "?";
+        finalUri = `${mongoUri}${separator}retryWrites=true&w=majority`;
+      }
+      const client3 = new MongoClient3(finalUri, {
+        serverSelectionTimeoutMS: 1e4,
+        connectTimeoutMS: 15e3,
+        tls: true,
+        tlsAllowInvalidCertificates: true
+      });
+      await client3.connect();
+      const db2 = client3.db("adsc_reports");
+      const usersCollection = db2.collection("users");
+      await usersCollection.updateOne(
+        { _id: user._id },
+        { $set: { password: hashedNewPassword } }
+      );
+      await client3.close();
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
   app2.post("/api/reports", async (req, res) => {
     try {
       const validatedData = insertReportSchema.parse(req.body);
@@ -383,10 +540,21 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: error.message });
     }
   });
+  app2.put("/api/reports/:id", requireAuth, async (req, res) => {
+    try {
+      const reportId = req.params.id;
+      const reportData = req.body;
+      const result = await storage.updateReport(reportId, reportData);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
   app2.delete("/api/reports/:id", requireAuth, async (req, res) => {
     try {
-      await storage.deleteReport(req.params.id);
-      res.json({ success: true });
+      const reportId = req.params.id;
+      const result = await storage.deleteReport(reportId);
+      res.json(result);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -405,7 +573,9 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { fileURLToPath } from "url";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+var __dirname = path.dirname(fileURLToPath(import.meta.url));
 var vite_config_default = defineConfig({
   plugins: [
     react(),
@@ -421,14 +591,14 @@ var vite_config_default = defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets")
+      "@": path.resolve(__dirname, "client", "src"),
+      "@shared": path.resolve(__dirname, "shared"),
+      "@assets": path.resolve(__dirname, "attached_assets")
     }
   },
-  root: path.resolve(import.meta.dirname, "client"),
+  root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true
   },
   server: {
@@ -510,6 +680,19 @@ function serveStatic(app2) {
 
 // server/index.ts
 var app = express2();
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", "ws:", "wss:"]
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
 app.use(express2.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;

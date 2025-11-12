@@ -2,7 +2,7 @@ interface ReportHeaderProps {
   date: string;
 }
 
-const logoUrl = "/public/adsc-logo-alt.png";
+const logoUrl = "/adsc-logo-alt.png";
 
 export default function ReportHeader({ date }: ReportHeaderProps) {
   return (

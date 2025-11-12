@@ -4,9 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Printer, Calendar, Save, History, LogIn, Shield } from "lucide-react";
+import { Printer, Calendar, Save, History, LogIn, Shield, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
 import ServiceEntryForm from "@/components/ServiceEntryForm";
@@ -20,7 +28,10 @@ export default function Home() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [onlinePayment, setOnlinePayment] = useState<string>('0');
   const [showReport, setShowReport] = useState(false);
+  const [showOperatorDialog, setShowOperatorDialog] = useState(false);
+  const [operatorName, setOperatorName] = useState('');
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -55,8 +66,9 @@ export default function Home() {
   const calculateSummary = (): ReportSummary => {
     const totalServices = services.reduce((sum, s) => sum + s.amount, 0);
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const onlinePaymentAmount = parseFloat(onlinePayment) || 0;
     const netProfit = totalServices - totalExpenses;
-    return { totalServices, totalExpenses, netProfit };
+    return { totalServices, totalExpenses, netProfit, onlinePayment: onlinePaymentAmount, cashPayment: 0 };
   };
 
   const report: DailyReport = {
@@ -68,7 +80,28 @@ export default function Home() {
   const summary = calculateSummary();
 
   const handlePrint = () => {
-    // Open print in new tab
+    setShowOperatorDialog(true);
+  };
+
+  const handleConfirmPrint = () => {
+    if (!operatorName.trim()) {
+      toast({
+        title: "Operator Name Required",
+        description: "Please enter the operator name for the signature.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Store operator name temporarily in the DOM
+    const reportContainer = document.querySelector('.print-report-container');
+    if (reportContainer) {
+      const operatorSignElement = reportContainer.querySelector('.operator-signature-name');
+      if (operatorSignElement) {
+        operatorSignElement.textContent = operatorName;
+      }
+    }
+
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
@@ -76,9 +109,7 @@ export default function Home() {
         <html>
           <head>
             <title>Print Report - ${new Date(date).toLocaleDateString('en-IN')}</title>
-            ${Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))
-              .map(el => el.outerHTML)
-              .join('\n')}
+            ${Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style')).map(style => style.outerHTML).join('\n')}
           </head>
           <body>
             ${document.querySelector('.print-report-container')?.outerHTML || ''}
@@ -92,6 +123,9 @@ export default function Home() {
       `);
       printWindow.document.close();
     }
+
+    setShowOperatorDialog(false);
+    setOperatorName('');
   };
 
   const handleGenerateReport = () => {
@@ -109,6 +143,7 @@ export default function Home() {
       totalServices: summary.totalServices.toString(),
       totalExpenses: summary.totalExpenses.toString(),
       netProfit: summary.netProfit.toString(),
+      onlinePayment: onlinePayment,
     };
     saveReportMutation.mutate(reportData);
   };
@@ -117,6 +152,7 @@ export default function Home() {
     if (existingReport) {
       setServices(existingReport.services as ServiceItem[]);
       setExpenses(existingReport.expenses as ExpenseItem[]);
+      setOnlinePayment(existingReport.onlinePayment || '0');
       setShowReport(true);
       toast({
         title: "Report Loaded",
@@ -131,7 +167,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <img src="/public/adsc-logo.png" alt="ADSC Logo" className="h-14 w-auto" />
+              <img src="/adsc-logo.png" alt="ADSC Logo" className="h-14 w-auto" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground tracking-tight" data-testid="text-app-title">
                   ADSC Daily Report Generator
@@ -190,7 +226,7 @@ export default function Home() {
                 </div>
                 <h2 className="text-xl font-semibold text-foreground">Report Information</h2>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="report-date" className="text-sm font-medium">
@@ -205,7 +241,7 @@ export default function Home() {
                     data-testid="input-report-date"
                   />
                 </div>
-                
+
                 {existingReport && (
                   <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
                     <p className="text-sm text-foreground mb-3 font-medium">
@@ -233,6 +269,31 @@ export default function Home() {
               <ExpenseEntryForm expenses={expenses} onExpensesChange={setExpenses} />
             </Card>
 
+            <Card className="p-6 shadow-lg border-0 bg-card/50 backdrop-blur">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-green-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground">Online Payment</h2>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="online-payment" className="text-sm font-medium">
+                  Online Payment Amount (₹)
+                </Label>
+                <Input
+                  id="online-payment"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={onlinePayment}
+                  onChange={(e) => setOnlinePayment(e.target.value)}
+                  placeholder="0.00"
+                  className="h-11"
+                  data-testid="input-online-payment"
+                />
+              </div>
+            </Card>
+
             <div className="flex gap-3 pt-2">
               <Button
                 onClick={handleGenerateReport}
@@ -246,6 +307,7 @@ export default function Home() {
                 onClick={() => {
                   setServices([]);
                   setExpenses([]);
+                  setOnlinePayment('0');
                   setShowReport(false);
                 }}
                 variant="outline"
@@ -287,6 +349,41 @@ export default function Home() {
           <ReportDisplay report={report} summary={summary} />
         </div>
       )}
+
+      <Dialog open={showOperatorDialog} onOpenChange={setShowOperatorDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Operator Signature</DialogTitle>
+            <DialogDescription>
+              Enter the operator name that will appear on the printed report.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="operator-name">Operator Name</Label>
+            <Input
+              id="operator-name"
+              type="text"
+              value={operatorName}
+              onChange={(e) => setOperatorName(e.target.value)}
+              placeholder="Enter operator name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleConfirmPrint();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowOperatorDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmPrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
