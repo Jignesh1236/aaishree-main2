@@ -337,49 +337,51 @@ export default function Admin() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Filters Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
+        <Card className="mb-6 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Filter className="h-5 w-5 text-primary" />
                   Filters
                 </CardTitle>
-                <CardDescription>Filter and sort reports</CardDescription>
+                <CardDescription className="mt-1">Filter and sort reports</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={clearFilters}>
+              <Button variant="outline" size="sm" onClick={clearFilters} className="self-start sm:self-auto">
                 Clear Filters
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CardContent className="pt-0">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="date-from">Date From</Label>
+                <Label htmlFor="date-from" className="text-sm font-medium">Date From</Label>
                 <Input
                   id="date-from"
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
+                  className="h-10"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="date-to">Date To</Label>
+                <Label htmlFor="date-to" className="text-sm font-medium">Date To</Label>
                 <Input
                   id="date-to"
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
+                  className="h-10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="profit-filter">Profit/Loss</Label>
+                <Label htmlFor="profit-filter" className="text-sm font-medium">Profit/Loss</Label>
                 <Select value={profitFilter} onValueChange={(value: any) => setProfitFilter(value)}>
-                  <SelectTrigger id="profit-filter">
+                  <SelectTrigger id="profit-filter" className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -390,21 +392,22 @@ export default function Admin() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="search">Search</Label>
+              <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                <Label htmlFor="search" className="text-sm font-medium">Search</Label>
                 <Input
                   id="search"
                   type="text"
                   placeholder="Search by date, service, expense..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sort-by">Sort By</Label>
+                <Label htmlFor="sort-by" className="text-sm font-medium">Sort By</Label>
                 <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                  <SelectTrigger id="sort-by">
+                  <SelectTrigger id="sort-by" className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -416,9 +419,9 @@ export default function Admin() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sort-order">Sort Order</Label>
+                <Label htmlFor="sort-order" className="text-sm font-medium">Sort Order</Label>
                 <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
-                  <SelectTrigger id="sort-order">
+                  <SelectTrigger id="sort-order" className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -429,61 +432,72 @@ export default function Admin() {
               </div>
             </div>
             
-            <div className="mt-4 text-sm text-muted-foreground">
-              Showing {reports.length} of {allReports.length} reports
+            <div className="mt-4 pt-3 border-t text-sm text-muted-foreground flex items-center gap-2">
+              <span className="font-medium">Showing {reports.length}</span>
+              <span>of</span>
+              <span className="font-medium">{allReports.length}</span>
+              <span>reports</span>
             </div>
           </CardContent>
         </Card>
 
         {/* Analytics Cards */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
+          <Card className="shadow-sm hover:shadow-md transition-all hover:scale-[1.02] duration-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Reports</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-blue-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{analytics.totalReports}</div>
-              <p className="text-xs text-muted-foreground">Filtered results</p>
+              <div className="text-3xl font-bold text-blue-600">{analytics.totalReports}</div>
+              <p className="text-xs text-muted-foreground mt-1">Filtered results</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-600" />
+          <Card className="shadow-sm hover:shadow-md transition-all hover:scale-[1.02] duration-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-3xl font-bold text-green-600">
                 {formatCurrency(analytics.totalRevenue)}
               </div>
-              <p className="text-xs text-muted-foreground">From filtered reports</p>
+              <p className="text-xs text-muted-foreground mt-1">From filtered reports</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <DollarSign className="h-4 w-4 text-red-600" />
+          <Card className="shadow-sm hover:shadow-md transition-all hover:scale-[1.02] duration-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
+              <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-red-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-3xl font-bold text-red-600">
                 {formatCurrency(analytics.totalExpenses)}
               </div>
-              <p className="text-xs text-muted-foreground">From filtered reports</p>
+              <p className="text-xs text-muted-foreground mt-1">From filtered reports</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-600" />
+          <Card className="shadow-sm hover:shadow-md transition-all hover:scale-[1.02] duration-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Profit</CardTitle>
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${analytics.totalProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'}`}>
+                <TrendingUp className={`h-4 w-4 ${analytics.totalProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`} />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${analytics.totalProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+              <div className={`text-3xl font-bold ${analytics.totalProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                 {formatCurrency(analytics.totalProfit)}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 Avg: {formatCurrency(analytics.averageProfit)}
               </p>
             </CardContent>
@@ -491,45 +505,47 @@ export default function Admin() {
         </div>
 
         {/* Export Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Export Reports</CardTitle>
+        <Card className="mb-6 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Export Reports</CardTitle>
             <CardDescription>Download filtered reports in various formats</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4">
-              <Button onClick={exportToCSV} variant="outline">
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={exportToCSV} variant="outline" className="flex-1 sm:flex-none">
                 <Download className="h-4 w-4 mr-2" />
                 Export as CSV
               </Button>
-              <Button onClick={exportToJSON} variant="outline">
+              <Button onClick={exportToJSON} variant="outline" className="flex-1 sm:flex-none">
                 <Download className="h-4 w-4 mr-2" />
                 Export as JSON
               </Button>
-              <Button onClick={exportSummaryReport} variant="outline">
+              <Button onClick={exportSummaryReport} variant="outline" className="flex-1 sm:flex-none">
                 <Download className="h-4 w-4 mr-2" />
-                Export Summary Report
+                Export Summary
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-4">
-              {reports.length} reports available for export
+            <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
+              <span className="font-medium">{reports.length}</span> reports available for export
             </p>
           </CardContent>
         </Card>
 
         {/* Filtered Reports List */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Filtered Reports</CardTitle>
+        <Card className="mb-6 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Filtered Reports</CardTitle>
             <CardDescription>Reports matching your filter criteria</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {reports.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {reports.map((report) => (
-                  <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div key={report.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/30 hover:shadow-sm transition-all gap-3">
                     <div className="flex items-center gap-3">
-                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="h-5 w-5 text-primary" />
+                      </div>
                       <div>
                         <p className="font-medium">
                           {new Date(report.date).toLocaleDateString('en-IN', { 
@@ -539,14 +555,14 @@ export default function Admin() {
                             day: 'numeric' 
                           })}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {report.services.length} services, {report.expenses.length} expenses
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {report.services.length} services • {report.expenses.length} expenses
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 sm:ml-auto">
                       <div className="text-right">
-                        <p className={`font-semibold ${parseFloat(report.netProfit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <p className={`font-semibold text-lg ${parseFloat(report.netProfit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {formatCurrency(parseFloat(report.netProfit))}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -558,6 +574,7 @@ export default function Admin() {
                         size="icon"
                         onClick={() => handleEditReport(report)}
                         title="Edit Report"
+                        className="flex-shrink-0"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -566,55 +583,59 @@ export default function Admin() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-muted-foreground py-8">No reports match your filters</p>
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
+                <p className="text-muted-foreground font-medium">No reports match your filters</p>
+                <p className="text-xs text-muted-foreground mt-1">Try adjusting your filter criteria</p>
+              </div>
             )}
           </CardContent>
         </Card>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setLocation("/")}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-primary" />
+        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
+          <Card className="shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] duration-200 cursor-pointer group" onClick={() => setLocation("/")}>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <FileText className="h-7 w-7 text-primary" />
                 </div>
                 <div>
-                  <CardTitle>Create Daily Report</CardTitle>
-                  <CardDescription>Generate new daily business report</CardDescription>
+                  <CardTitle className="text-lg">Create Daily Report</CardTitle>
+                  <CardDescription className="mt-1">Generate new daily business report</CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
+            <CardContent className="pt-0">
+              <p className="text-sm text-muted-foreground mb-4">
                 Enter services and expenses to create a new daily report for your business.
               </p>
               <Link href="/">
-                <Button className="w-full mt-4">
+                <Button className="w-full">
                   Go to Report Creation
                 </Button>
               </Link>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setLocation("/history")}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <History className="h-6 w-6 text-blue-500" />
+          <Card className="shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] duration-200 cursor-pointer group" onClick={() => setLocation("/history")}>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <History className="h-7 w-7 text-blue-500" />
                 </div>
                 <div>
-                  <CardTitle>Report History</CardTitle>
-                  <CardDescription>View and manage past reports</CardDescription>
+                  <CardTitle className="text-lg">Report History</CardTitle>
+                  <CardDescription className="mt-1">View and manage past reports</CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
+            <CardContent className="pt-0">
+              <p className="text-sm text-muted-foreground mb-4">
                 Access historical reports, view details, print, and delete reports as needed.
               </p>
               <Link href="/history">
-                <Button className="w-full mt-4" variant="outline">
+                <Button className="w-full" variant="outline">
                   View History
                 </Button>
               </Link>
