@@ -12,7 +12,7 @@ async function connectToMongoDB(): Promise<Db | null> {
   const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
   
   if (!mongoUri) {
-    console.warn('⚠️  MONGODB_URI not set - storage features will be limited');
+    console.warn('\x1b[33m⚠ MONGODB_URI not set - storage features will be limited\x1b[0m');
     return null;
   }
 
@@ -36,11 +36,11 @@ async function connectToMongoDB(): Promise<Db | null> {
     
     db = client.db('adsc_reports');
     
-    console.log('✅ Connected to MongoDB successfully');
+    console.log('\x1b[32m✓ Connected to MongoDB successfully\x1b[0m');
     return db;
   } catch (error) {
-    console.warn('⚠️  MongoDB connection failed - app will run with limited features');
-    console.warn('Error details:', error instanceof Error ? error.message : error);
+    console.warn('\x1b[33m⚠ MongoDB connection failed - app will run with limited features\x1b[0m');
+    console.warn('\x1b[90m  Error:', error instanceof Error ? error.message : error, '\x1b[0m');
     return null;
   }
 }
@@ -56,7 +56,13 @@ export class MongoStorage implements IStorage {
     
     this.collection = database.collection('reports');
     
-    await this.collection.createIndex({ date: 1 }, { unique: true });
+    try {
+      await this.collection.dropIndex('date_1');
+    } catch (error) {
+      // Index doesn't exist, which is fine
+    }
+    
+    await this.collection.createIndex({ date: 1 });
     
     return this.collection;
   }
@@ -74,6 +80,7 @@ export class MongoStorage implements IStorage {
       totalServices: insertReport.totalServices,
       totalExpenses: insertReport.totalExpenses,
       netProfit: insertReport.netProfit,
+      onlinePayment: insertReport.onlinePayment || "0",
       createdAt: new Date(),
     };
 
@@ -96,7 +103,7 @@ export class MongoStorage implements IStorage {
       .sort({ date: -1 })
       .toArray();
 
-    return reports.map(doc => ({
+    return reports.map((doc: any) => ({
       id: doc._id.toString(),
       date: doc.date,
       services: doc.services,
@@ -104,6 +111,7 @@ export class MongoStorage implements IStorage {
       totalServices: doc.totalServices,
       totalExpenses: doc.totalExpenses,
       netProfit: doc.netProfit,
+      onlinePayment: doc.onlinePayment || "0",
       createdAt: doc.createdAt,
     }));
   }
@@ -134,21 +142,20 @@ export class MongoStorage implements IStorage {
       totalServices: doc.totalServices,
       totalExpenses: doc.totalExpenses,
       netProfit: doc.netProfit,
+      onlinePayment: doc.onlinePayment || "0",
       createdAt: doc.createdAt,
     };
   }
 
-  async getReportByDate(date: string): Promise<Report | undefined> {
+  async getReportsByDate(date: string): Promise<Report[]> {
     const collection = await this.getCollection();
     if (!collection) {
-      return undefined;
+      return [];
     }
     
-    const doc = await collection.findOne({ date });
+    const docs = await collection.find({ date }).sort({ createdAt: -1 }).toArray();
     
-    if (!doc) return undefined;
-
-    return {
+    return docs.map((doc: any) => ({
       id: doc._id.toString(),
       date: doc.date,
       services: doc.services,
@@ -156,11 +163,12 @@ export class MongoStorage implements IStorage {
       totalServices: doc.totalServices,
       totalExpenses: doc.totalExpenses,
       netProfit: doc.netProfit,
+      onlinePayment: doc.onlinePayment || "0",
       createdAt: doc.createdAt,
-    };
+    }));
   }
 
-  async deleteReport(id: string): Promise<void> {
+  async deleteReport(id: string): Promise<{ success: boolean }> {
     const collection = await this.getCollection();
     if (!collection) {
       throw new Error('Database not available - please set MONGODB_URI');
@@ -174,7 +182,47 @@ export class MongoStorage implements IStorage {
       throw new Error('Invalid report ID');
     }
 
-    await collection.deleteOne({ _id: objectId });
+    const result = await collection.deleteOne({ _id: objectId });
+    
+    if (result.deletedCount === 0) {
+      throw new Error('Report not found');
+    }
+
+    return { success: true };
+  }
+
+  async updateReport(id: string, reportData: any): Promise<{ success: boolean }> {
+    const collection = await this.getCollection();
+    if (!collection) {
+      throw new Error('Database not available - please set MONGODB_URI');
+    }
+    
+    let objectId;
+    
+    try {
+      objectId = new ObjectId(id);
+    } catch {
+      throw new Error('Invalid report ID');
+    }
+
+    const updateFields: any = {};
+    if (reportData.date) updateFields.date = reportData.date;
+    if (reportData.services) updateFields.services = reportData.services;
+    if (reportData.expenses) updateFields.expenses = reportData.expenses;
+    if (reportData.totalServices !== undefined) updateFields.totalServices = reportData.totalServices;
+    if (reportData.totalExpenses !== undefined) updateFields.totalExpenses = reportData.totalExpenses;
+    if (reportData.netProfit !== undefined) updateFields.netProfit = reportData.netProfit;
+
+    const result = await collection.updateOne(
+      { _id: objectId },
+      { $set: updateFields }
+    );
+
+    if (result.matchedCount === 0) {
+      throw new Error('Report not found');
+    }
+
+    return { success: true };
   }
 }
 

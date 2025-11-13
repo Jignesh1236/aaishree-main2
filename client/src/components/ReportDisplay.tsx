@@ -17,11 +17,13 @@ export default function ReportDisplay({ report, summary }: ReportDisplayProps) {
   };
 
   const maxRows = Math.max(report.services.length, report.expenses.length);
-  
-  // Determine table size class based on row count
+
+  // Determine table size class based on row count - more aggressive sizing
   const getTableSizeClass = () => {
+    if (maxRows > 35) return 'ultra-compact-print';
     if (maxRows > 25) return 'very-compact-print';
     if (maxRows > 15) return 'compact-print';
+    if (maxRows > 10) return 'medium-compact-print';
     return '';
   };
 
@@ -62,7 +64,7 @@ export default function ReportDisplay({ report, summary }: ReportDisplayProps) {
             </tbody>
           </table>
 
-          <div className="mt-6 p-5 bg-gray-200 border-2 border-gray-800 rounded-lg">
+          <div className="mt-4 p-4 bg-gray-200 border-2 border-gray-800 rounded-lg print:mt-3 print:p-3">
             <div className="flex justify-between items-center">
               <span className="text-lg font-bold uppercase tracking-wide">Net Profit:</span>
               <span className={`text-2xl font-bold ${summary.netProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
@@ -87,7 +89,7 @@ export default function ReportDisplay({ report, summary }: ReportDisplayProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {report.services.map((service, index) => (
+                    {report.services.filter(service => service.name.trim() !== '').map((service, index) => (
                       <tr
                         key={service.id}
                         className={index % 2 === 0 ? 'bg-background print:bg-white' : 'bg-muted/30 print:bg-white'}
@@ -166,6 +168,10 @@ export default function ReportDisplay({ report, summary }: ReportDisplayProps) {
               <span className="font-semibold print:text-sm">{formatCurrency(summary.totalServices)}</span>
             </div>
             <div className="flex justify-between items-center pb-2 border-b print:text-black print:border-gray-300 print:pb-1">
+              <span className="font-medium print:text-sm">Online Payment</span>
+              <span className="font-semibold print:text-sm text-green-600 print:text-green-700">{formatCurrency(summary.onlinePayment)}</span>
+            </div>
+            <div className="flex justify-between items-center pb-2 border-b print:text-black print:border-gray-300 print:pb-1">
               <span className="font-medium print:text-sm">Total Expenses</span>
               <span className="font-semibold print:text-sm">{formatCurrency(summary.totalExpenses)}</span>
             </div>
@@ -180,6 +186,21 @@ export default function ReportDisplay({ report, summary }: ReportDisplayProps) {
             </div>
           </div>
         </Card>
+
+        <div className="mt-8 print:mt-6 pt-6 print:pt-3 border-t border-gray-300">
+          <div className="flex justify-between">
+            <div className="text-center">
+              <div className="border-t-2 border-gray-800 w-48 mb-2 print:mb-3"></div>
+              <p className="text-sm font-semibold text-foreground print:text-black">Operator Signature</p>
+              <p className="text-xs text-muted-foreground print:text-gray-600 mt-1 operator-signature-name">&nbsp;</p>
+            </div>
+            <div className="text-center">
+              <div className="border-t-2 border-gray-800 w-48 mb-2 print:mb-3"></div>
+              <p className="text-sm font-semibold text-foreground print:text-black">Authorized Signature</p>
+              <p className="text-xs text-muted-foreground print:text-gray-600 mt-1">ADSC</p>
+            </div>
+          </div>
+        </div>
 
         <div className="hidden print:block print-footer border-t border-gray-400 text-center text-gray-600">
           <p>Generated on {new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}</p>

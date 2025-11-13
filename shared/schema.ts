@@ -19,6 +19,7 @@ export const insertReportSchema = z.object({
   totalServices: z.string(),
   totalExpenses: z.string(),
   netProfit: z.string(),
+  onlinePayment: z.string().optional().default("0"),
 });
 
 export const reportSchema = insertReportSchema.extend({
@@ -62,4 +63,6 @@ export interface ReportSummary {
   totalServices: number;
   totalExpenses: number;
   netProfit: number;
+  onlinePayment: number;
+  cashPayment: number;
 }

@@ -16,7 +16,43 @@ export function log(message: string, source = "express") {
     hour12: true,
   });
 
-  console.log(`${formattedTime} [${source}] ${message}`);
+  console.log(`\x1b[36m${formattedTime}\x1b[0m [\x1b[35m${source}\x1b[0m] ${message}`);
+}
+
+export function logSuccess(message: string, source = "server") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`\x1b[36m${formattedTime}\x1b[0m [\x1b[35m${source}\x1b[0m] \x1b[32m✓\x1b[0m ${message}`);
+}
+
+export function logError(message: string, source = "server", error?: any) {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`\x1b[36m${formattedTime}\x1b[0m [\x1b[35m${source}\x1b[0m] \x1b[31m✗\x1b[0m ${message}`);
+  if (error) {
+    console.log(`  \x1b[90m${error instanceof Error ? error.message : error}\x1b[0m`);
+  }
+}
+
+export function logWarning(message: string, source = "server") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`\x1b[36m${formattedTime}\x1b[0m [\x1b[35m${source}\x1b[0m] \x1b[33m⚠\x1b[0m ${message}`);
 }
 
 export async function setupVite(app: Express, server: Server) {
