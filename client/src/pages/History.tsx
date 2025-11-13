@@ -27,7 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-const logoUrl = "/public/adsc-logo-alt.png";
+const logoUrl = "/adsc-logo.png";
 
 export default function History() {
   const { toast } = useToast();
@@ -280,6 +280,25 @@ export default function History() {
                   Print Report
                 </Button>
               </div>
+              {/* Print-only section */}
+              {selectedReport && (
+                <div className="print-only print-report-container">
+                  <ReportDisplay
+                    report={{
+                      date: selectedReport.date,
+                      services: selectedReport.services as ServiceItem[],
+                      expenses: selectedReport.expenses as ExpenseItem[],
+                    }}
+                    summary={{
+                      totalServices: parseFloat(selectedReport.totalServices),
+                      totalExpenses: parseFloat(selectedReport.totalExpenses),
+                      netProfit: parseFloat(selectedReport.netProfit),
+                      onlinePayment: parseFloat(selectedReport.onlinePayment || '0'),
+                      cashPayment: 0,
+                    }}
+                  />
+                </div>
+              )}
               <ReportDisplay
                 report={{
                   date: selectedReport.date,
@@ -290,6 +309,8 @@ export default function History() {
                   totalServices: parseFloat(selectedReport.totalServices as string),
                   totalExpenses: parseFloat(selectedReport.totalExpenses as string),
                   netProfit: parseFloat(selectedReport.netProfit as string),
+                  onlinePayment: parseFloat(selectedReport.onlinePayment as string || '0'),
+                  cashPayment: 0,
                 }}
               />
             </div>

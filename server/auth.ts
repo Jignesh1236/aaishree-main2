@@ -49,7 +49,7 @@ async function getDb() {
   if (!client) {
     const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
     if (!mongoUri) {
-      console.warn('⚠️  MONGODB_URI not set - authentication features will be limited');
+      console.warn('\x1b[33m⚠ MONGODB_URI not set - authentication features will be limited\x1b[0m');
       return null;
     }
     
@@ -69,9 +69,10 @@ async function getDb() {
       
       await client.connect();
       dbConnected = true;
-      console.log('✅ MongoDB connected for auth');
+      console.log('\x1b[32m✓ MongoDB connected for authentication\x1b[0m');
     } catch (error) {
-      console.warn('⚠️  MongoDB connection failed - app will run with limited features:', error instanceof Error ? error.message : error);
+      console.warn('\x1b[33m⚠ MongoDB connection failed - app will run with limited features\x1b[0m');
+      console.warn('\x1b[90m  Error:', error instanceof Error ? error.message : error, '\x1b[0m');
       return null;
     }
   }
@@ -119,20 +120,20 @@ function clearFailedLogins(username: string) {
   loginAttempts.delete(username);
 }
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+export async function comparePasswords(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-async function getUserByUsername(username: string) {
+export async function getUserByUsername(username: string) {
   const db = await getDb();
   if (!db) return null;
   const usersCollection = db.collection('users');
@@ -153,7 +154,7 @@ async function ensureAdminUser() {
   try {
     const db = await getDb();
     if (!db) {
-      console.warn('⚠️  Skipping admin user creation - database not connected');
+      console.warn('\x1b[33m⚠ Skipping admin user creation - database not connected\x1b[0m');
       return;
     }
     const usersCollection = db.collection('users');
@@ -166,12 +167,13 @@ async function ensureAdminUser() {
         password: await hashPassword(adminPassword),
         createdAt: new Date(),
       });
-      console.log(`✅ Admin user created: ${adminUsername}`);
+      console.log(`\x1b[32m✓ Admin user created: ${adminUsername}\x1b[0m`);
     } else {
-      console.log(`✅ Admin user already exists: ${adminUsername}`);
+      console.log(`\x1b[32m✓ Admin user already exists: ${adminUsername}\x1b[0m`);
     }
   } catch (error) {
-    console.error('⚠️  Failed to create admin user:', error);
+    console.error('\x1b[31m✗ Failed to create admin user\x1b[0m');
+    console.error('\x1b[90m  Error:', error, '\x1b[0m');
   }
 }
 
@@ -182,7 +184,7 @@ export function setupAuth(app: Express) {
   
   const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
   if (!process.env.SESSION_SECRET) {
-    console.warn('⚠️  SESSION_SECRET not set - using random generated secret (sessions will not persist across restarts)');
+    console.warn('\x1b[33m⚠ SESSION_SECRET not set - using random generated secret (sessions will not persist across restarts)\x1b[0m');
   }
   
   const sessionSettings: session.SessionOptions = {
