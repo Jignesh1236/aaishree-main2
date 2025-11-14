@@ -58,10 +58,6 @@ export default function Login() {
     }
   }, [user, setLocation]);
 
-  if (user) {
-    return null;
-  }
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     loginMutation.mutate(loginData);
@@ -70,6 +66,15 @@ export default function Login() {
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!registerData.username || registerData.username.length < 3) {
+      toast({
+        title: "Invalid Username",
+        description: "Username must be at least 3 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (registerData.password !== registerData.confirmPassword) {
       toast({
         title: "Password Mismatch",
@@ -79,10 +84,10 @@ export default function Login() {
       return;
     }
 
-    if (registerData.password.length < 8) {
+    if (registerData.password.length < 6) {
       toast({
         title: "Password Too Short",
-        description: "Password must be at least 8 characters long.",
+        description: "Password must be at least 6 characters long.",
         variant: "destructive",
       });
       return;
