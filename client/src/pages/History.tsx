@@ -5,7 +5,7 @@ import { Trash2, Eye, ArrowLeft, LogIn, Shield } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Report } from "@shared/schema";
+import type { Report, ServiceItem, ExpenseItem } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import {
   AlertDialog,
@@ -19,6 +19,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import ReportDisplay from "@/components/ReportDisplay";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import FavoriteReports, { useFavorites } from "@/components/FavoriteReports";
 import { useState } from "react";
 import {
   Dialog,
@@ -33,6 +35,7 @@ export default function History() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const favorites = useFavorites();
 
   const { data: reports, isLoading } = useQuery<Report[]>({
     queryKey: ['/api/reports'],
@@ -129,6 +132,7 @@ export default function History() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               {user ? (
                 <Link href="/admin">
                   <Button variant="outline" size="sm">
@@ -208,6 +212,8 @@ export default function History() {
                   </div>
 
                   <div className="flex gap-2">
+                    <FavoriteReports reportId={report.id} size="sm" />
+                    
                     <Button
                       variant="outline"
                       size="icon"

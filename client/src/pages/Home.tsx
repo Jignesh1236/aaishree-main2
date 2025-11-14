@@ -20,6 +20,9 @@ import { Link } from "wouter";
 import ServiceEntryForm from "@/components/ServiceEntryForm";
 import ExpenseEntryForm from "@/components/ExpenseEntryForm";
 import ReportDisplay from "@/components/ReportDisplay";
+import TemplateManager from "@/components/TemplateManager";
+import KeyboardShortcuts from "@/components/KeyboardShortcuts";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type { ServiceItem, ExpenseItem, DailyReport, ReportSummary, Report } from "@shared/schema";
 
 const logoUrl = "/attached_assets/download_1762507279905.png";
@@ -39,6 +42,10 @@ export default function Home() {
   const { data: existingReports } = useQuery<Report[]>({
     queryKey: ['/api/reports/date', date],
     enabled: !!date,
+  });
+
+  const { data: allReports = [] } = useQuery<Report[]>({
+    queryKey: ['/api/reports'],
   });
 
   const saveReportMutation = useMutation({
@@ -198,6 +205,11 @@ export default function Home() {
     });
   };
 
+  const handleLoadTemplate = (templateServices: ServiceItem[], templateExpenses: ExpenseItem[]) => {
+    setServices(templateServices);
+    setExpenses(templateExpenses);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <div className="no-print border-b bg-card/80 backdrop-blur-sm shadow-sm">
@@ -215,6 +227,8 @@ export default function Home() {
               </div>
             </div>
             <div className="flex gap-3">
+              <ThemeToggle />
+              <KeyboardShortcuts />
               <Link href="/history">
                 <Button variant="outline" className="gap-2" data-testid="button-history">
                   <History className="h-4 w-4" />
@@ -335,6 +349,12 @@ export default function Home() {
                 />
               </div>
             </Card>
+
+            <TemplateManager
+              onLoadTemplate={handleLoadTemplate}
+              currentServices={services}
+              currentExpenses={expenses}
+            />
 
             <div className="flex gap-3 pt-2">
               <Button

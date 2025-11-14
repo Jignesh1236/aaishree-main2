@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { LogOut, FileText, History, User, Download, TrendingUp, DollarSign, Calendar, Filter, Edit, Printer, Trash2, KeyRound, BarChart3 } from "lucide-react";
+import { LogOut, FileText, History, User, Download, TrendingUp, DollarSign, Calendar, Filter, Edit, Printer, Trash2, KeyRound, BarChart3, Users, Activity } from "lucide-react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import type { Report } from "@shared/schema";
@@ -14,6 +14,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import ReportDisplay from "@/components/ReportDisplay";
 import AnalyticsCharts from "@/components/AnalyticsCharts";
+import EnhancedAnalytics from "@/components/EnhancedAnalytics";
+import BackupRestore from "@/components/BackupRestore";
+import ReportComparison from "@/components/ReportComparison";
+import GoalsTracker from "@/components/GoalsTracker";
+import ExpenseCategories from "@/components/ExpenseCategories";
+import FavoriteReports, { useFavorites } from "@/components/FavoriteReports";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import jsPDF from "jspdf";
@@ -95,7 +102,7 @@ export default function Admin() {
   });
 
   const updateReportMutation = useMutation({
-    mutationFn: async (data: { id: number; report: any }) => {
+    mutationFn: async (data: { id: string; report: any }) => {
       const response = await fetch(`/api/reports/${data.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -501,7 +508,37 @@ export default function Admin() {
               <div className="flex items-center gap-2 text-sm">
                 <User className="h-4 w-4" />
                 <span className="font-medium">{user?.username}</span>
+                {user?.role && (
+                  <span className="text-xs px-2 py-1 bg-primary/10 rounded-full text-primary font-semibold">
+                    {user.role}
+                  </span>
+                )}
               </div>
+              <ThemeToggle />
+              {user?.role === "admin" && (
+                <>
+                  <Link href="/admin/users">
+                    <Button variant="outline" size="sm">
+                      <Users className="h-4 w-4 mr-2" />
+                      Users
+                    </Button>
+                  </Link>
+                  <Link href="/admin/activity">
+                    <Button variant="outline" size="sm">
+                      <Activity className="h-4 w-4 mr-2" />
+                      Activity
+                    </Button>
+                  </Link>
+                </>
+              )}
+              {user?.role === "manager" && (
+                <Link href="/admin/activity">
+                  <Button variant="outline" size="sm">
+                    <Activity className="h-4 w-4 mr-2" />
+                    Activity
+                  </Button>
+                </Link>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -691,32 +728,83 @@ export default function Admin() {
           </Card>
         </div>
 
-        {/* Export Section */}
-        <Card className="mb-6 shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Export Reports</CardTitle>
-            <CardDescription>Download filtered reports in various formats</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={exportToCSV} variant="outline" className="flex-1 sm:flex-none">
-                <Download className="h-4 w-4 mr-2" />
-                Export as CSV
-              </Button>
-              <Button onClick={exportToJSON} variant="outline" className="flex-1 sm:flex-none">
-                <Download className="h-4 w-4 mr-2" />
-                Export as JSON
-              </Button>
-              <Button onClick={exportSummaryReport} variant="outline" className="flex-1 sm:flex-none">
-                <Download className="h-4 w-4 mr-2" />
-                Export Summary
+        {/* Export and Backup Section */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-6">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">Export Reports</CardTitle>
+              <CardDescription>Download filtered reports in various formats</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={exportToCSV} variant="outline" className="flex-1 sm:flex-none">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export as CSV
+                </Button>
+                <Button onClick={exportToJSON} variant="outline" className="flex-1 sm:flex-none">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export as JSON
+                </Button>
+                <Button onClick={exportSummaryReport} variant="outline" className="flex-1 sm:flex-none">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Summary
+                </Button>
+                <Button onClick={exportToPDF} variant="outline" className="flex-1 sm:flex-none">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export as PDF
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
+                <span className="font-medium">{reports.length}</span> reports available for export
+              </p>
+            </CardContent>
+          </Card>
+          
+          <BackupRestore />
+        </div>
+
+        {/* Enhanced Analytics Section */}
+        {showAnalytics && allReports.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <BarChart3 className="h-6 w-6 text-primary" />
+                Advanced Analytics
+              </h2>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowAnalytics(false)}
+              >
+                Hide Analytics
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
-              <span className="font-medium">{reports.length}</span> reports available for export
-            </p>
-          </CardContent>
-        </Card>
+            <EnhancedAnalytics reports={allReports} />
+          </div>
+        )}
+
+        {!showAnalytics && allReports.length > 0 && (
+          <div className="mb-6">
+            <Button 
+              onClick={() => setShowAnalytics(true)} 
+              variant="outline" 
+              className="w-full gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Show Advanced Analytics & Charts
+            </Button>
+          </div>
+        )}
+
+        {/* New Features Section */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-6">
+          <GoalsTracker reports={allReports} />
+          <ReportComparison reports={allReports} />
+        </div>
+
+        <div className="mb-6">
+          <ExpenseCategories reports={allReports} />
+        </div>
 
         {/* Filtered Reports List */}
         <Card className="mb-6 shadow-sm">
