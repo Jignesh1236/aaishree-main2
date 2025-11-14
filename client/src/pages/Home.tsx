@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Printer, Calendar, Save, History, LogIn, Shield, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import {
   Dialog,
   DialogContent,
