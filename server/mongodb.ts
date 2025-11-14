@@ -81,6 +81,8 @@ export class MongoStorage implements IStorage {
       totalExpenses: insertReport.totalExpenses,
       netProfit: insertReport.netProfit,
       onlinePayment: insertReport.onlinePayment || "0",
+      createdBy: insertReport.createdBy,
+      createdByUsername: insertReport.createdByUsername,
       createdAt: new Date(),
     };
 
@@ -112,6 +114,8 @@ export class MongoStorage implements IStorage {
       totalExpenses: doc.totalExpenses,
       netProfit: doc.netProfit,
       onlinePayment: doc.onlinePayment || "0",
+      createdBy: doc.createdBy,
+      createdByUsername: doc.createdByUsername,
       createdAt: doc.createdAt,
     }));
   }
@@ -143,6 +147,8 @@ export class MongoStorage implements IStorage {
       totalExpenses: doc.totalExpenses,
       netProfit: doc.netProfit,
       onlinePayment: doc.onlinePayment || "0",
+      createdBy: doc.createdBy,
+      createdByUsername: doc.createdByUsername,
       createdAt: doc.createdAt,
     };
   }
@@ -164,6 +170,8 @@ export class MongoStorage implements IStorage {
       totalExpenses: doc.totalExpenses,
       netProfit: doc.netProfit,
       onlinePayment: doc.onlinePayment || "0",
+      createdBy: doc.createdBy,
+      createdByUsername: doc.createdByUsername,
       createdAt: doc.createdAt,
     }));
   }

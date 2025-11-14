@@ -15,6 +15,8 @@ declare global {
     interface User {
       id: string;
       username: string;
+      role: "admin" | "manager" | "employee";
+      email?: string;
       createdAt: Date;
     }
   }
@@ -147,6 +149,41 @@ async function getUserById(id: string) {
   return await usersCollection.findOne({ _id: new ObjectId(id) });
 }
 
+async function logActivity(
+  userId: string,
+  username: string,
+  action: string,
+  options?: {
+    resourceType?: string;
+    resourceId?: string;
+    metadata?: Record<string, any>;
+    ipAddress?: string;
+    userAgent?: string;
+  }
+) {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    
+    const activityLogsCollection = db.collection('activity_logs');
+    await activityLogsCollection.insertOne({
+      userId,
+      username,
+      action,
+      resourceType: options?.resourceType,
+      resourceId: options?.resourceId,
+      metadata: options?.metadata,
+      ipAddress: options?.ipAddress,
+      userAgent: options?.userAgent,
+      timestamp: new Date(),
+    });
+  } catch (error) {
+    console.error('Failed to log activity:', error);
+  }
+}
+
+export { logActivity };
+
 async function ensureAdminUser() {
   const adminUsername = process.env.ADMIN_USERNAME || 'admin';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
@@ -165,6 +202,9 @@ async function ensureAdminUser() {
       await usersCollection.insertOne({
         username: adminUsername,
         password: await hashPassword(adminPassword),
+        role: 'admin',
+        email: process.env.ADMIN_EMAIL || undefined,
+        isActive: true,
         createdAt: new Date(),
       });
       console.log(`\x1b[32m✓ Admin user created: ${adminUsername}\x1b[0m`);
@@ -220,14 +260,29 @@ export function setupAuth(app: Express) {
         if (!user || !(await comparePasswords(password, user.password))) {
           recordFailedLogin(username);
           return done(null, false, { message: "Invalid username or password" });
-        } else {
-          clearFailedLogins(username);
-          return done(null, {
-            id: user._id.toString(),
-            username: user.username,
-            createdAt: user.createdAt,
-          });
         }
+        
+        if (user.isActive === false) {
+          return done(null, false, { message: "Account is deactivated" });
+        }
+        
+        clearFailedLogins(username);
+        
+        const db = await getDb();
+        if (db) {
+          await db.collection('users').updateOne(
+            { _id: user._id },
+            { $set: { lastLogin: new Date() } }
+          );
+        }
+        
+        return done(null, {
+          id: user._id.toString(),
+          username: user.username,
+          role: user.role || 'employee',
+          email: user.email,
+          createdAt: user.createdAt,
+        });
       } catch (error) {
         return done(error);
       }
@@ -244,6 +299,8 @@ export function setupAuth(app: Express) {
       done(null, {
         id: user._id.toString(),
         username: user.username,
+        role: user.role || 'employee',
+        email: user.email,
         createdAt: user.createdAt,
       });
     } catch (error) {
@@ -287,4 +344,29 @@ export function requireAuth(req: any, res: any, next: any) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
+}
+
+export function requireRole(...roles: Array<"admin" | "manager" | "employee">) {
+  return (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        error: "Forbidden", 
+        message: "You don't have permission to access this resource" 
+      });
+    }
+    
+    next();
+  };
+}
+
+export function requireAdmin(req: any, res: any, next: any) {
+  return requireRole("admin")(req, res, next);
+}
+
+export function requireManagerOrAdmin(req: any, res: any, next: any) {
+  return requireRole("admin", "manager")(req, res, next);
 }

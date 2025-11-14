@@ -20,12 +20,16 @@ export const insertReportSchema = z.object({
   totalExpenses: z.string(),
   netProfit: z.string(),
   onlinePayment: z.string().optional().default("0"),
+  createdBy: z.string().optional(),
+  createdByUsername: z.string().optional(),
 });
 
 export const reportSchema = insertReportSchema.extend({
   id: z.string(),
   createdAt: z.date(),
 });
+
+export const userRoleSchema = z.enum(["admin", "manager", "employee"]);
 
 export const insertUserSchema = z.object({
   username: z.string()
@@ -39,19 +43,33 @@ export const insertUserSchema = z.object({
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
+  email: z.string().email("Valid email is required").optional(),
+  role: userRoleSchema.default("employee"),
 });
 
 export const userSchema = insertUserSchema.extend({
   id: z.string(),
   createdAt: z.date(),
+  isActive: z.boolean().default(true),
+  lastLogin: z.date().optional(),
 });
 
+export const updateUserSchema = z.object({
+  email: z.string().email("Valid email is required").optional(),
+  role: userRoleSchema.optional(),
+  isActive: z.boolean().optional(),
+}).refine(data => Object.keys(data).length > 0, {
+  message: "At least one field must be provided for update",
+});
+
+export type UserRole = z.infer<typeof userRoleSchema>;
 export type ServiceItem = z.infer<typeof serviceItemSchema>;
 export type ExpenseItem = z.infer<typeof expenseItemSchema>;
 export type Report = z.infer<typeof reportSchema>;
 export type InsertReport = z.infer<typeof insertReportSchema>;
 export type User = z.infer<typeof userSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateUser = z.infer<typeof updateUserSchema>;
 
 export interface DailyReport {
   date: string;
@@ -66,3 +84,30 @@ export interface ReportSummary {
   onlinePayment: number;
   cashPayment: number;
 }
+
+export const activityLogSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  username: z.string(),
+  action: z.enum([
+    "login", 
+    "logout", 
+    "report_created", 
+    "report_updated", 
+    "report_deleted", 
+    "report_viewed",
+    "report_exported",
+    "report_shared",
+    "user_created",
+    "user_updated",
+    "user_deleted"
+  ]),
+  resourceType: z.string().optional(),
+  resourceId: z.string().optional(),
+  metadata: z.record(z.any()).optional(),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+  timestamp: z.date(),
+});
+
+export type ActivityLog = z.infer<typeof activityLogSchema>;
