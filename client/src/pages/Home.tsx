@@ -38,6 +38,7 @@ export default function Home() {
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
   const { data: existingReports } = useQuery<Report[]>({
     queryKey: ['/api/reports/date', date],
@@ -136,6 +137,17 @@ export default function Home() {
   };
 
   const handleGenerateReport = () => {
+    // Check authentication first
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please login or register to generate reports.",
+        variant: "destructive",
+      });
+      setLocation("/login");
+      return;
+    }
+
     // Validation
     if (!date) {
       toast({
@@ -182,6 +194,16 @@ export default function Home() {
   };
 
   const handleSaveReport = () => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please login to save reports.",
+        variant: "destructive",
+      });
+      setLocation("/login");
+      return;
+    }
+
     const reportData = {
       date,
       services,
