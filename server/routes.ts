@@ -192,6 +192,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Employee Self-Registration (Public)
+  app.post("/api/register-employee", async (req: Request, res: Response) => {
+    try {
+      const validationResult = insertUserSchema.safeParse({
+        ...req.body,
+        role: 'employee' // Force employee role for self-registration
+      });
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: fromZodError(validationResult.error).message 
+        });
+      }
+      
+      const { username, password, email } = validationResult.data;
+
+      const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+      if (!mongoUri) {
+        return res.status(500).json({ error: "Database not configured" });
+      }
+
+      let finalUri = mongoUri;
+      if (!mongoUri.includes('retryWrites')) {
+        const separator = mongoUri.includes('?') ? '&' : '?';
+        finalUri = `${mongoUri}${separator}retryWrites=true&w=majority`;
+      }
+
+      const client = new MongoClient(finalUri, {
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 15000,
+        tls: true,
+        tlsAllowInvalidCertificates: true,
+      });
+
+      await client.connect();
+      const db = client.db('adsc_reports');
+      const usersCollection = db.collection('users');
+      
+      const existingUser = await usersCollection.findOne({ username });
+      if (existingUser) {
+        await client.close();
+        return res.status(400).json({ error: "Username already exists" });
+      }
+      
+      const hashedPassword = await hashPassword(password);
+      const newUser = {
+        username,
+        password: hashedPassword,
+        email: email || undefined,
+        role: 'employee',
+        isActive: true,
+        createdAt: new Date(),
+      };
+      
+      const result = await usersCollection.insertOne(newUser);
+      await client.close();
+      
+      res.json({ 
+        id: result.insertedId.toString(),
+        username,
+        message: "Employee registration successful" 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // User Management Routes (Admin only)
   
   // Get all users (Admin only)
