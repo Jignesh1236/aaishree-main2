@@ -37,33 +37,6 @@ export type ExpenseItem = z.infer<typeof expenseItemSchema>;
 export const userRoleSchema = z.enum(["admin", "manager", "employee"]);
 
 export const insertUserSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  email: z.string().email().optional().or(z.literal("")),
-  role: userRoleSchema.optional().default("employee"),
-});
-
-export const updateUserSchema = z.object({
-  email: z.string().email().optional().or(z.literal("")),
-  role: userRoleSchema.optional(),
-  isActive: z.boolean().optional(),
-});
-
-export const userSchema = z.object({
-  id: z.string(),
-  username: z.string(),
-  password: z.string(),
-  email: z.string().optional(),
-  role: userRoleSchema,
-  isActive: z.boolean().default(true),
-  createdAt: z.date(),
-});
-
-export type User = z.infer<typeof userSchema>;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type UpdateUser = z.infer<typeof updateUserSchema>;
-
-export const insertUserSchema = z.object({
   username: z.string()
     .min(3, "Username must be at least 3 characters")
     .max(30, "Username must not exceed 30 characters")
@@ -95,10 +68,6 @@ export const updateUserSchema = z.object({
 });
 
 export type UserRole = z.infer<typeof userRoleSchema>;
-export type ServiceItem = z.infer<typeof serviceItemSchema>;
-export type ExpenseItem = z.infer<typeof expenseItemSchema>;
-export type Report = z.infer<typeof reportSchema>;
-export type InsertReport = z.infer<typeof insertReportSchema>;
 export type User = z.infer<typeof userSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type UpdateUser = z.infer<typeof updateUserSchema>;
